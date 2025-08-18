@@ -1,0 +1,28 @@
+interpreter = ["bash", "-euo", "pipefail", "-c"]
+
+[[task]]
+name = "reuse"
+group = "lints"
+script = "reuse lint"
+
+[[task]]
+name = "markdownlint"
+group = "lints"
+script = """
+git ls-files --cached --others --exclude-standard '*.md' | xargs markdownlint
+"""
+
+[[task]]
+name = "gofmt"
+group = "lints"
+script = "test -z \"$(gofmt -l .)\""
+
+[[task]]
+name = "go-vet"
+group = "lints"
+script = "go vet ./..."
+
+[[task]]
+name = "nix"
+group = "build"
+script = "nix build -f nix output.package.default"

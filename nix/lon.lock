@@ -1,0 +1,25 @@
+{
+  "version": "1",
+  "sources": {
+    "nixpkgs": {
+      "type": "Git",
+      "fetchType": "git",
+      "branch": "nixos-unstable",
+      "revision": "20075955deac2583bb12f07151c2df830ef346b4",
+      "url": "https://github.com/NixOS/nixpkgs",
+      "hash": "sha256-HMwfAJBdrr8wXAkbGhtcby1zGFvs+StOp19xNsbqdOg=",
+      "lastModified": 1755615617,
+      "submodules": false
+    },
+    "sprinkles": {
+      "type": "Git",
+      "fetchType": "git",
+      "branch": "v1",
+      "revision": "ea4a98c94b55248f47088b894076e2bc1324729a",
+      "url": "https://git.afnix.fr/sprinkles/sprinkles",
+      "hash": "sha256-5qybmqAULprqd1xkq6HIuKQfid/5a4YC4Np0NrrLTx0=",
+      "lastModified": 1755918882,
+      "submodules": false
+    }
+  }
+}

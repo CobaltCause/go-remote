@@ -1,0 +1,37 @@
+env:
+  # Required to make things output color.
+  TERM: ansi
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  ci:
+    name: CI
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Sync repository
+        uses: actions/checkout@v4
+
+      - name: Install Lix
+        uses: samueldr/lix-gha-installer-action@v2025-02-26.prerelease
+        with:
+          extra_nix_config: |
+            extra-experimental-features = nix-command
+
+      - name: Install `direnv`
+        run: nix profile install -f nix input.nixpkgs.direnv
+
+      # Do this to shorten the logs for the actual CI step.
+      - name: Populate `/nix/store`
+        run: nix develop -f nix output.shell.default --command true
+
+      - name: Perform continuous integration
+        run: |
+          direnv allow
+          direnv exec . engage

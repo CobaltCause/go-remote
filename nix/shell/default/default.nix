@@ -6,6 +6,8 @@
   go,
   markdownlint-cli,
   mkShell,
+  protobuf,
+  protoc-gen-go,
   reuse,
 }:
 
@@ -16,6 +18,8 @@ mkShell {
     findutils
     go
     markdownlint-cli
+    protobuf
+    protoc-gen-go
     reuse
   ]
   # Keep sorted.

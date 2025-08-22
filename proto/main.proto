@@ -1,0 +1,110 @@
+edition = "2023";
+
+import "google/protobuf/empty.proto";
+
+service GoRemote {
+  // Start a new process, returning its ID.
+  rpc Start(StartRequest) returns (StartResponse) {}
+
+  // Stop a process by its ID.
+  rpc Stop(StopRequest) returns (google.protobuf.Empty) {}
+
+  // Check the status of a process by its ID.
+  rpc Status(StatusRequest) returns (StatusResponse) {}
+
+  // Stream the output of a process by its ID since the beginning of the
+  // process.
+  rpc Stream(StatusRequest) returns (stream Output) {}
+}
+
+// Ideally, I would use a type alias for all the places `uint32` is
+// used to refer to process IDs to improve readability/maintainability,
+// but unfortunately gRPC doesn't and won't support type aliases; see
+// <https://github.com/protocolbuffers/protobuf/issues/3521>. Also, it might
+// be nice to use a string to give processes human-readable names, but integers
+// are used instead because it will be simpler to implement since the server can
+// assign IDs so we don't have to handle reused names for example.
+
+// Ideally, a more structured type would be used to represent errors like
+// `google.rpc.Status`, but in the interest of simplicity/time, `string` is
+// used instead.
+
+// Note the use of `bytes` for the fields here. Protobuf's `string` type
+// requires the content be valid UTF-8 (which is good), but filesystems do not
+// generally share this requirement, so using that type would make it impossible
+// to run some programs as desired or at all. Also, one might think that it's
+// okay to use Protobuf's `string` type here since Go's standard library's
+// process management APIs use Go's `string` type anyway, but actually Go's
+// `string` type is only *conventionally* UTF-8, rather than that being a strict
+// requirement (which is... a choice).
+message StartRequest {
+  // Path to the program to start.
+  bytes path = 1;
+
+  // Arguments to the program to start, including the zeroth argument.
+  repeated bytes args = 2;
+}
+
+message StartResponse {
+  // A process's ID.
+  uint32 id = 1;
+}
+
+message StopRequest {
+  // A process's ID.
+  uint32 id = 1;
+}
+
+message StatusRequest {
+  // A process's ID.
+  uint32 id = 1;
+}
+
+message StreamRequest {
+  // A process's ID.
+  uint32 id = 1;
+}
+
+enum State {
+  UNSPECIFIED = 0;
+
+  // The process is currently running.
+  RUNNING = 1;
+
+  // The process exited normally.
+  EXITED = 2;
+
+  // The process was stopped, likely by a client's request.
+  STOPPED = 3;
+}
+
+message StatusResponse {
+  // Current state of the process.
+  State state = 1;
+
+  // The process's exit code, if it has exited.
+  //
+  // If the process has not yet exited, this value will be explicitly unset.
+  //
+  // If we only care about Linux, a 1-byte unsigned integer would be sufficient,
+  // but it doesn't seem like gRPC supports that type. `int32` is chosen instead
+  // since that's (roughly) what Go's standard library uses to model this value.
+  int32 exit_code = 2;
+}
+
+enum OutputKind {
+  STDOUT = 0;
+  STDERR = 1;
+}
+
+message Output {
+  // Which kind of process output this is.
+  //
+  // If the process does not exist, this will be explicitly unset.
+  OutputKind kind = 1;
+
+  // The output of a process.
+  //
+  // If the process does not exist, this will be explicitly unset.
+  bytes data = 2;
+}

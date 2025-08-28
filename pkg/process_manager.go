@@ -142,6 +142,20 @@ func (s *ProcessManager) Stop(id int) error {
 	return nil
 }
 
+// Wait waits for a process to terminate.
+//
+// An error is returned if the process ID is not known or waiting failed.
+func (s *ProcessManager) Wait(id int) error {
+	p, err := s.acquireProcess(id)
+	if err != nil {
+		return err
+	}
+
+	p.waitTerminated()
+
+	return nil
+}
+
 // Status returns the status of a process by its ID.
 //
 // An error is returned if the process ID is not known.

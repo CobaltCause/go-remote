@@ -35,7 +35,7 @@ type ProcessManager struct {
 	// TODO
 }
 
-func (*ProcessManager) Start() uint32 {
+func (*ProcessManager) Start() int {
 	panic("TODO")
 }
 
@@ -43,21 +43,21 @@ func (*ProcessManager) Start() uint32 {
 //
 // If the error is not `nil`, then the process was stopped. An error is returned
 // if the process ID does not exist.
-func (*ProcessManager) Stop(id uint32) error {
+func (*ProcessManager) Stop(id int) error {
 	panic("TODO")
 }
 
 // Status returns the status of a process by its ID.
 //
 // An error is returned if the process ID is not known.
-func (*ProcessManager) Status(id uint32) (ProcessStatus, error) {
+func (*ProcessManager) Status(id int) (ProcessStatus, error) {
 	panic("TODO")
 }
 
 // Stream gets a reader of the process's stdout and stderr since it was started.
 //
 // Returns `nil, nil` if the process ID is not known.
-func (*ProcessManager) Stream(id uint32) (stdout io.Reader, stderr io.Reader) {
+func (*ProcessManager) Stream(id int) (stdout io.Reader, stderr io.Reader) {
 	// Would construct a `processStream` for stderr and stdout and return it.
 	panic("TODO")
 }

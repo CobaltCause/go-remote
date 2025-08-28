@@ -35,7 +35,11 @@ type ProcessManager struct {
 	// TODO
 }
 
-func (*ProcessManager) Start() int {
+// Start starts a process and returns its ID.
+//
+// If `path` contains no path separators, the location is resolved from `$PATH`.
+// Note that `args` includes `argv[0]`.
+func (*ProcessManager) Start(path string, args ...string) int {
 	panic("TODO")
 }
 

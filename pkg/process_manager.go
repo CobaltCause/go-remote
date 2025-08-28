@@ -19,7 +19,7 @@ const (
 
 type ProcessStatus struct {
 	// ExitStatus is only valid if `State` is `EXITED`.
-	ExitStatus int32
+	ExitStatus int
 	State      ProcessState
 }
 

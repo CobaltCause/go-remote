@@ -67,3 +67,60 @@ func innerStartStatusStopStatus(t *testing.T, pm *ProcessManager) {
 		t.Error("Unexpected State, got:", st.State)
 	}
 }
+
+func TestStartWaitStatus(t *testing.T) {
+	pm := new(ProcessManager)
+
+	var wg sync.WaitGroup
+
+	// TODO: Use wg.Go when 1.25 is available in nixpkgs.
+	for range 3 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			innerStartWaitStatus(t, pm)
+		}()
+	}
+
+	wg.Wait()
+}
+
+func innerStartWaitStatus(t *testing.T, pm *ProcessManager) {
+	id, err := pm.Start("false", "false")
+	if err != nil {
+		t.Error("Start unexpectedly failed:", err)
+		return
+	}
+
+	wait := func() {
+		if err := pm.Wait(id); err != nil {
+			t.Error("Wait unexpectedly failed:", err)
+		}
+	}
+
+	// Do this to try ensure repeated/concurrent calls to `Stop` for the same
+	// process ID don't cause problems.
+	//
+	// TODO: Use wg.Go when 1.25 is available in nixpkgs.
+	var wg sync.WaitGroup
+	for range 3 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			wait()
+		}()
+	}
+	wg.Wait()
+
+	st, err := pm.Status(id)
+	if err != nil {
+		t.Error("Status unexpectedly failed:", err)
+		return
+	}
+	if st.State != EXITED {
+		t.Error("Unexpected State, got:", st.State)
+	}
+	if st.ExitStatus != 1 {
+		t.Error("Unexpected ExitStatus, got:", st.ExitStatus)
+	}
+}

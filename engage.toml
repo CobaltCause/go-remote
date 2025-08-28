@@ -25,7 +25,7 @@ script = "go vet ./..."
 [[task]]
 name = "go"
 group = "tests"
-script = "go test ./..."
+script = "go test ./... -count=1"
 
 [[task]]
 name = "nix"

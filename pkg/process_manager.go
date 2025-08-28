@@ -48,7 +48,7 @@ func (s *ProcessManager) Start(path string, args ...string) (int, error) {
 // Stop stops a process by its ID.
 //
 // If the error is not `nil`, then the process was stopped. An error is returned
-// if the process ID does not exist.
+// if the process ID does not exist or the process could not be killed.
 func (s *ProcessManager) Stop(id int) error {
 	panic("TODO")
 }

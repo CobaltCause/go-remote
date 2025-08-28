@@ -6,6 +6,7 @@
   go,
   markdownlint-cli,
   mkShell,
+  openssl,
   reuse,
   shellcheck,
   shfmt,
@@ -18,6 +19,7 @@ mkShell {
     findutils
     go
     markdownlint-cli
+    openssl
     reuse
     shellcheck
     shfmt

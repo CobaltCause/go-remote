@@ -6,7 +6,7 @@ type ProcessState int
 
 const (
 	// RUNNING indicates that the process has not yet terminated.
-	RUNNING = iota
+	RUNNING ProcessState = iota
 
 	// EXITED indicates that the process has exited normally.
 	EXITED

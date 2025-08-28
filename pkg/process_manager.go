@@ -39,7 +39,9 @@ type ProcessManager struct {
 //
 // If `path` contains no path separators, the location is resolved from `$PATH`.
 // Note that `args` includes `argv[0]`.
-func (*ProcessManager) Start(path string, args ...string) int {
+//
+// This function fails if starting the process fails.
+func (*ProcessManager) Start(path string, args ...string) (int, error) {
 	panic("TODO")
 }
 

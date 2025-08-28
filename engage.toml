@@ -23,6 +23,11 @@ group = "lints"
 script = "go vet ./..."
 
 [[task]]
+name = "go"
+group = "tests"
+script = "go test ./..."
+
+[[task]]
 name = "nix"
 group = "build"
 script = "nix build -f nix output.package.default"

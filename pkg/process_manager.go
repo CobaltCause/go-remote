@@ -122,6 +122,36 @@ func (s *ProcessManager) Stop(id int) error {
 	return nil
 }
 
+// StopAll stops all still-running process and waits for them to exit.
+//
+// This function should be called to to release system resources.
+func (s *ProcessManager) StopAll() {
+	s.processesLock.Lock()
+	defer s.processesLock.Unlock()
+
+	for _, p := range s.processes {
+		func() {
+			p.cmdLock.Lock()
+			defer p.cmdLock.Unlock()
+
+			// Process has already stopped or exited.
+			if p.cmd.ProcessState != nil {
+				return
+			}
+
+			// Explicitly ignoring errors since they most likely mean the
+			// process is already stopped. Perhaps some logging would be useful
+			// here.
+			if err := p.cmd.Process.Kill(); err != nil {
+				return
+			}
+			if err := p.cmd.Wait(); err != nil {
+				return
+			}
+		}()
+	}
+}
+
 // Wait waits for a process to terminate.
 //
 // An error is returned if the process ID is not known or waiting failed.

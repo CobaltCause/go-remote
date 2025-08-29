@@ -22,9 +22,7 @@ buildGoModule (finalAttrs: {
       ];
     };
 
-  # Set this to avoid having to update a hash all the time. Unfortunately this
-  # means dependencies need to be vendored.
-  vendorHash = null;
+  vendorHash = "sha256-GXCx7MQq1zwvQQYHvQLntHFgXbldIJY9jNyjfsxmDTQ=";
 
   meta.mainProgram = finalAttrs.name;
 })

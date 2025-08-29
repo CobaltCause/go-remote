@@ -3,6 +3,8 @@ package process_manager
 import (
 	"sync"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestStartStatusStopStatus(t *testing.T) {
@@ -23,26 +25,18 @@ func TestStartStatusStopStatus(t *testing.T) {
 }
 
 func innerStartStatusStopStatus(t *testing.T, pm *ProcessManager) {
+	assert := assert.New(t)
+
 	id, err := pm.Start("sleep", "sleep", "infinity")
-	if err != nil {
-		t.Error("Start unexpectedly failed:", err)
+	if !assert.Nil(err) {
 		return
 	}
 
 	st, err := pm.Status(id)
-	if err != nil {
-		t.Error("Status unexpectedly failed:", err)
+	if !assert.Nil(err) {
 		return
 	}
-	if st.State != RUNNING {
-		t.Error("Unexpected State, got:", st.State)
-	}
-
-	stop := func() {
-		if err := pm.Stop(id); err != nil {
-			t.Error("Stop unexpectedly failed:", err)
-		}
-	}
+	assert.Equal(st.State, RUNNING)
 
 	// Do this to try ensure repeated/concurrent calls to `Stop` for the same
 	// process ID don't cause problems.
@@ -53,19 +47,16 @@ func innerStartStatusStopStatus(t *testing.T, pm *ProcessManager) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			stop()
+			assert.Nil(pm.Stop(id))
 		}()
 	}
 	wg.Wait()
 
 	st, err = pm.Status(id)
-	if err != nil {
-		t.Error("Status unexpectedly failed:", err)
+	if !assert.Nil(err) {
 		return
 	}
-	if st.State != STOPPED {
-		t.Error("Unexpected State, got:", st.State)
-	}
+	assert.Equal(st.State, STOPPED)
 }
 
 func TestStartWaitStatus(t *testing.T) {
@@ -86,16 +77,11 @@ func TestStartWaitStatus(t *testing.T) {
 }
 
 func innerStartWaitStatus(t *testing.T, pm *ProcessManager) {
-	id, err := pm.Start("false", "false")
-	if err != nil {
-		t.Error("Start unexpectedly failed:", err)
-		return
-	}
+	assert := assert.New(t)
 
-	wait := func() {
-		if err := pm.Wait(id); err != nil {
-			t.Error("Wait unexpectedly failed:", err)
-		}
+	id, err := pm.Start("false", "false")
+	if !assert.Nil(err) {
+		return
 	}
 
 	// Do this to try ensure repeated/concurrent calls to `Stop` for the same
@@ -107,20 +93,15 @@ func innerStartWaitStatus(t *testing.T, pm *ProcessManager) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			wait()
+			assert.Nil(pm.Wait(id))
 		}()
 	}
 	wg.Wait()
 
 	st, err := pm.Status(id)
-	if err != nil {
-		t.Error("Status unexpectedly failed:", err)
+	if !assert.Nil(err) {
 		return
 	}
-	if st.State != EXITED {
-		t.Error("Unexpected State, got:", st.State)
-	}
-	if st.ExitStatus != 1 {
-		t.Error("Unexpected ExitStatus, got:", st.ExitStatus)
-	}
+	assert.Equal(st.State, EXITED)
+	assert.Equal(st.ExitStatus, 1)
 }

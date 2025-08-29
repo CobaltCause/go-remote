@@ -9,6 +9,7 @@ import (
 
 func TestStartStatusStopStatus(t *testing.T) {
 	pm := new(ProcessManager)
+	defer pm.StopAll()
 
 	var wg sync.WaitGroup
 
@@ -61,6 +62,7 @@ func innerStartStatusStopStatus(t *testing.T, pm *ProcessManager) {
 
 func TestStartWaitStatus(t *testing.T) {
 	pm := new(ProcessManager)
+	defer pm.StopAll()
 
 	var wg sync.WaitGroup
 

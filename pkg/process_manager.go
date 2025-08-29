@@ -142,6 +142,28 @@ func (s *ProcessManager) Stop(id int) error {
 	return nil
 }
 
+// StopAll stops all still-running process and waits for them to exit.
+//
+// This function should be called to to release system resources.
+func (s *ProcessManager) StopAll() {
+	s.processesLock.Lock()
+	defer s.processesLock.Unlock()
+
+	var wg sync.WaitGroup
+
+	for _, p := range s.processes {
+		// TODO: Use wg.Go when 1.25 is available in nixpkgs.
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			p.cancel()
+			p.waitTerminated()
+		}()
+	}
+
+	wg.Wait()
+}
+
 // Wait waits for a process to terminate.
 //
 // An error is returned if the process ID is not known or waiting failed.

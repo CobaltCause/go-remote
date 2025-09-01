@@ -1,6 +1,9 @@
 package process_manager
 
 import (
+	"errors"
+	"fmt"
+	"io"
 	"sync"
 	"testing"
 
@@ -106,4 +109,74 @@ func innerStartWaitStatus(t *testing.T, pm *ProcessManager) {
 	}
 	assert.Equal(EXITED, st.State)
 	assert.Equal(1, st.ExitCode)
+}
+
+func TestStream(t *testing.T) {
+	assert := assert.New(t)
+
+	pm := new(ProcessManager)
+	defer pm.StopAll()
+
+	// Ideally this test would use an IPC mechanism for synchronization, as time
+	// is not a synchronization primitive, and relying on timing for
+	// synchronization causes tests to become unnecessarily slow and unreliable.
+
+	id, err := pm.Start("bash", "bash", "-c", `
+		for x in $(seq 1 3); do
+			sleep 0.25
+			echo "test $x"
+		done
+	`)
+	if !assert.Nil(err) {
+		return
+	}
+
+	readStream := func(postWait bool) {
+		stdout, stderr := pm.Stream(id)
+		defer func() {
+			if stdout.Close() != nil {
+				panic("unreachable")
+			}
+		}()
+		defer func() {
+			if stderr.Close() != nil {
+				panic("unreachable")
+			}
+		}()
+
+		iter := 1
+		for {
+			buf := make([]byte, 1024)
+
+			n, err := stdout.Read(buf)
+
+			// This conversion should be fine since we control the started
+			// process's output.
+			t.Logf("Read: %#v", string(buf[:n]))
+
+			if errors.Is(err, io.EOF) {
+				t.Log("Last read was EOF")
+				assert.Equal("", string(buf[:n]))
+				break
+			}
+
+			assert.Nil(err, "unexpected error")
+
+			if postWait {
+				// Should be able to fetch the entire history in one read.
+				assert.Equal("test 1\ntest 2\ntest 3\n", string(buf[:n]))
+			} else {
+				// Should fetch each new output as it comes in.
+				assert.Equal(fmt.Sprintf("test %v\n", iter), string(buf[:n]))
+			}
+
+			iter += 1
+		}
+	}
+
+	readStream(false)
+
+	assert.Nil(pm.Wait(id))
+
+	readStream(true)
 }

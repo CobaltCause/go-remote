@@ -1,5 +1,18 @@
 interpreter = ["bash", "-euo", "pipefail", "-c"]
 
+[[group]]
+name = "lints"
+depends = ["gen"]
+
+[[group]]
+name = "tests"
+depends = ["gen"]
+
+[[task]]
+name = "protoc"
+group = "gen"
+script = "gen-proto"
+
 [[task]]
 name = "reuse"
 group = "lints"
@@ -21,6 +34,16 @@ script = "test -z \"$(gofmt -l .)\""
 name = "go-vet"
 group = "lints"
 script = "go vet ./..."
+
+[[task]]
+name = "shellcheck"
+group = "lints"
+script = "find bin -type f -exec shellcheck {} \\;"
+
+[[task]]
+name = "shfmt"
+group = "lints"
+script = "shfmt -d -i 4 ."
 
 [[task]]
 name = "go"

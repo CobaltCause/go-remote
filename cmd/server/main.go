@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"errors"
 	"fmt"
 	"io"
@@ -14,6 +16,7 @@ import (
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
 
@@ -81,7 +84,6 @@ func (s *grpcServer) Stop(_ context.Context, req *pb.StopRequest) (
 func (s *grpcServer) Status(_ context.Context, req *pb.StatusRequest) (
 	*pb.StatusResponse, error,
 ) {
-
 	st, err := s.processManager.Status(int(req.GetId()))
 
 	if err != nil {
@@ -184,6 +186,10 @@ func (s *grpcServer) Stream(
 var CLI struct {
 	Address netip.Addr `name:"address" short:"a" required:"" help:"IP address to listen on."`
 	Port    uint16     `name:"port" short:"p" required:"" help:"Port to listen on."`
+
+	Certificate          string `name:"certificate" short:"c" required:"" help:"Server certificate."`
+	Key                  string `name:"key" short:"k" required:"" help:"Server private key."`
+	CertificateAuthority string `name:"certificate-authority" short:"C" required:"" help:"Certificate authority certificate."`
 }
 
 func main() {
@@ -196,6 +202,29 @@ func main() {
 func tryMain() error {
 	kong.Parse(&CLI)
 
+	certificate, err := tls.LoadX509KeyPair(CLI.Certificate, CLI.Key)
+	if err != nil {
+		return fmt.Errorf("failed to load certificate and key: %w", err)
+	}
+
+	caCert, err := os.ReadFile(CLI.CertificateAuthority)
+	if err != nil {
+		return fmt.Errorf("failed to read CA certificate file: %w", err)
+	}
+
+	certPool := x509.NewCertPool()
+	certPool.AppendCertsFromPEM(caCert)
+
+	tlsConfig := &tls.Config{
+		MinVersion:   tls.VersionTLS13,
+		Certificates: []tls.Certificate{certificate},
+		RootCAs:      certPool,
+		ClientCAs:    certPool,
+		ClientAuth:   tls.RequireAndVerifyClientCert,
+	}
+
+	opts := []grpc.ServerOption{grpc.Creds(credentials.NewTLS(tlsConfig))}
+
 	addrPort := netip.AddrPortFrom(CLI.Address, CLI.Port)
 	listener, err := net.Listen("tcp", addrPort.String())
 	if err != nil {
@@ -204,7 +233,7 @@ func tryMain() error {
 
 	log.Print("listening")
 
-	server := grpc.NewServer()
+	server := grpc.NewServer(opts...)
 	pb.RegisterGoRemoteServer(server, &grpcServer{})
 
 	if err := server.Serve(listener); err != nil {

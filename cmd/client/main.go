@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"errors"
 	"fmt"
 	"io"
@@ -11,7 +13,7 @@ import (
 
 	"github.com/alecthomas/kong"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/credentials"
 
 	pb "github.com/CobaltCause/go-remote/v2/gen/proto"
 )
@@ -19,6 +21,10 @@ import (
 var CLI struct {
 	Address netip.Addr `name:"address" short:"a" required:"" help:"IP address to connect to."`
 	Port    uint16     `name:"port" short:"p" required:"" help:"Port to connect to."`
+
+	Certificate          string `name:"certificate" short:"c" required:"" help:"Client certificate."`
+	Key                  string `name:"key" short:"k" required:"" help:"Client private key."`
+	CertificateAuthority string `name:"certificate-authority" short:"C" required:"" help:"Certificate authority certificate."`
 
 	Start struct {
 		Args []string `arg:"" name:"args" help:"Command to start and its arguments." passthrough:"partial"`
@@ -44,11 +50,31 @@ func main() {
 func tryMain() error {
 	ctx := kong.Parse(&CLI)
 
+	certificate, err := tls.LoadX509KeyPair(CLI.Certificate, CLI.Key)
+	if err != nil {
+		return fmt.Errorf("failed to load certificate and key: %w", err)
+	}
+
+	caCert, err := os.ReadFile(CLI.CertificateAuthority)
+	if err != nil {
+		return fmt.Errorf("failed to read CA certificate file: %w", err)
+	}
+
+	certPool := x509.NewCertPool()
+	certPool.AppendCertsFromPEM(caCert)
+
+	tlsConfig := &tls.Config{
+		MinVersion:   tls.VersionTLS13,
+		Certificates: []tls.Certificate{certificate},
+		RootCAs:      certPool,
+		ServerName:   "server",
+	}
+
 	addrPort := netip.AddrPortFrom(CLI.Address, CLI.Port)
 
 	client, err := grpc.NewClient(
 		addrPort.String(),
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithTransportCredentials(credentials.NewTLS(tlsConfig)),
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create client: %w", err)

@@ -17,6 +17,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/peer"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
 
@@ -31,9 +32,13 @@ type grpcServer struct {
 	processManager pm.ProcessManager
 }
 
-func (s *grpcServer) Start(_ context.Context, req *pb.StartRequest) (
+func (s *grpcServer) Start(ctx context.Context, req *pb.StartRequest) (
 	*pb.StartResponse, error,
 ) {
+	if err := checkAuthz(ctx, CONTROL); err != nil {
+		return nil, err
+	}
+
 	// Convert [][]byte to []string.
 	args := make([]string, len(req.GetArgs()))
 	for i, arg := range req.GetArgs() {
@@ -61,9 +66,13 @@ func (s *grpcServer) Start(_ context.Context, req *pb.StartRequest) (
 		nil
 }
 
-func (s *grpcServer) Stop(_ context.Context, req *pb.StopRequest) (
+func (s *grpcServer) Stop(ctx context.Context, req *pb.StopRequest) (
 	*emptypb.Empty, error,
 ) {
+	if err := checkAuthz(ctx, CONTROL); err != nil {
+		return nil, err
+	}
+
 	err := s.processManager.Stop(int(req.GetId()))
 
 	if err != nil {
@@ -81,9 +90,13 @@ func (s *grpcServer) Stop(_ context.Context, req *pb.StopRequest) (
 	return &emptypb.Empty{}, nil
 }
 
-func (s *grpcServer) Status(_ context.Context, req *pb.StatusRequest) (
+func (s *grpcServer) Status(ctx context.Context, req *pb.StatusRequest) (
 	*pb.StatusResponse, error,
 ) {
+	if err := checkAuthz(ctx, OBSERVE); err != nil {
+		return nil, err
+	}
+
 	st, err := s.processManager.Status(int(req.GetId()))
 
 	if err != nil {
@@ -120,6 +133,10 @@ func (s *grpcServer) Stream(
 	req *pb.StatusRequest,
 	stream grpc.ServerStreamingServer[pb.Output],
 ) error {
+	if err := checkAuthz(stream.Context(), OBSERVE); err != nil {
+		return err
+	}
+
 	stdout, stderr := s.processManager.Stream(int(req.GetId()))
 
 	if stdout == nil || stderr == nil {
@@ -181,6 +198,47 @@ func (s *grpcServer) Stream(
 	wg.Wait()
 
 	return nil
+}
+
+type authzLevel int
+
+const (
+	OBSERVE authzLevel = iota
+	CONTROL
+)
+
+var stringToAuthzLevel = map[string]authzLevel{
+	"observe": OBSERVE,
+	"control": CONTROL,
+}
+
+func checkAuthz(ctx context.Context, required authzLevel) (err error) {
+	err = status.Error(
+		codes.PermissionDenied,
+		"required authorization level not met",
+	)
+
+	peer, ok := peer.FromContext(ctx)
+	if !ok {
+		return
+	}
+
+	tlsInfo, ok := peer.AuthInfo.(credentials.TLSInfo)
+	if !ok {
+		return
+	}
+
+	for _, cert := range tlsInfo.State.PeerCertificates {
+		for _, ou := range cert.Subject.OrganizationalUnit {
+			if level, ok := stringToAuthzLevel[ou]; ok {
+				if level >= required {
+					return nil
+				}
+			}
+		}
+	}
+
+	return
 }
 
 var CLI struct {

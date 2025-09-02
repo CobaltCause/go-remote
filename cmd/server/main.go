@@ -4,10 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"net/netip"
 	"os"
+	"sync"
+	"sync/atomic"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -112,10 +115,70 @@ func (s *grpcServer) Status(_ context.Context, req *pb.StatusRequest) (
 }
 
 func (s *grpcServer) Stream(
-	*pb.StatusRequest,
-	grpc.ServerStreamingServer[pb.Output],
+	req *pb.StatusRequest,
+	stream grpc.ServerStreamingServer[pb.Output],
 ) error {
-	return status.Errorf(codes.Unimplemented, "method Stream not implemented")
+	stdout, stderr := s.processManager.Stream(int(req.GetId()))
+
+	if stdout == nil || stderr == nil {
+		log.Print("failed to stream process output: process ID not found")
+		return status.Error(codes.NotFound, "process ID not found")
+	}
+
+	log.Print("streaming output of process ID: ", req.GetId())
+
+	outputCh := make(chan *pb.Output)
+	var wg sync.WaitGroup
+	var sendBreak atomic.Bool
+
+	handleStream := func(reader io.ReadCloser, kind pb.OutputKind) {
+		defer wg.Done()
+		defer func() {
+			if reader.Close() != nil {
+				panic("unreachable")
+			}
+		}()
+
+		buf := make([]byte, 1024)
+
+		for {
+			if sendBreak.Load() {
+				break
+			}
+
+			n, err := reader.Read(buf)
+
+			if errors.Is(err, io.EOF) {
+				log.Print("process output finished streaming: ", kind)
+				break
+			} else if err != nil {
+				panic("unreachable")
+			}
+
+			outputCh <- &pb.Output{
+				Data: buf[:n],
+				Kind: &kind,
+			}
+		}
+	}
+
+	wg.Add(3)
+	go handleStream(stdout, *pb.OutputKind_STDOUT.Enum())
+	go handleStream(stderr, *pb.OutputKind_STDERR.Enum())
+	go func() {
+		defer wg.Done()
+
+		for {
+			if err := stream.Send(<-outputCh); err != nil {
+				log.Print("failed to stream output: ", err)
+				sendBreak.Store(true)
+				break
+			}
+		}
+	}()
+	wg.Wait()
+
+	return nil
 }
 
 var CLI struct {

@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"log"
 	"net/netip"
 	"os"
@@ -27,6 +29,9 @@ var CLI struct {
 	Status struct {
 		Id int `arg:"" name:"id" help:"ID of the remote process to get the status of."`
 	} `cmd:"" help:"Get the status of a remote process."`
+	Stream struct {
+		Id int `arg:"" name:"id" help:"ID of the remote process to stream the output of."`
+	} `cmd:"" help:"Stream the output of a remote process."`
 }
 
 func main() {
@@ -91,6 +96,39 @@ func tryMain() error {
 		log.Print("state: ", resp.GetState())
 		if exitCode := resp.ExitCode; exitCode != nil {
 			log.Print("exit code: ", *exitCode)
+		}
+	case "stream <id>":
+		id := uint32(CLI.Stream.Id)
+		stream, err := grpcClient.Stream(context.Background(), &pb.StatusRequest{
+			Id: &id,
+		})
+
+		if err != nil {
+			return fmt.Errorf("request failed: %w", err)
+		}
+
+		for {
+			resp, err := stream.Recv()
+			if errors.Is(err, io.EOF) {
+				break
+			} else if err != nil {
+				return fmt.Errorf("failed to receive data: %w", err)
+			}
+
+			switch resp.GetKind() {
+			case *pb.OutputKind_STDOUT.Enum():
+				_, err = os.Stdout.Write(resp.GetData())
+				if err != nil {
+					return fmt.Errorf("failed to write to stdout: %w", err)
+				}
+			case *pb.OutputKind_STDERR.Enum():
+				_, err = os.Stderr.Write(resp.GetData())
+				if err != nil {
+					return fmt.Errorf("failed to write to stderr: %w", err)
+				}
+			default:
+				panic("unreachable")
+			}
 		}
 	default:
 		panic(ctx.Command())

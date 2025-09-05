@@ -1,0 +1,115 @@
+#!/usr/bin/env bash
+
+# Create a certificate authority, server certificate, and one client certificate
+# for each authorization level in the target directory.
+
+set -euxo pipefail
+
+outdir="$1"
+
+mkdir -p "$outdir"
+
+# Generating a serial number like this allows the CA to add some randomness to
+# certificates it creates from CSRs so that it's even harder than it would
+# otherwise be for applicant-generated CSRs to create hash collisions.
+#
+# https://cabforum.org/2016/03/31/ballot-164-certificate-serial-number-entropy/
+gen_serial() {
+    python -c 'import secrets; print(secrets.randbits(64))'
+}
+
+genpkey=(
+    openssl genpkey
+    -algorithm ec
+    -pkeyopt ec_paramgen_curve:P-256
+    -out
+)
+showpkey=(openssl pkey -text -in)
+showcsr=(openssl req -text -in)
+showpem=(openssl x509 -text -in)
+
+# Generate CA private key.
+"${genpkey[@]}" "$outdir/ca.key"
+"${showpkey[@]}" "$outdir/ca.key"
+
+# Generate CA certificate.
+openssl req \
+    -key "$outdir/ca.key" \
+    -new \
+    -x509 \
+    -days 14 \
+    -addext keyUsage=critical,keyCertSign \
+    -subj "/CN=go-remote" \
+    -out "$outdir/ca.pem"
+"${showpem[@]}" "$outdir/ca.pem"
+
+# Generate server private key.
+"${genpkey[@]}" "$outdir/server.key"
+"${showpkey[@]}" "$outdir/server.key"
+
+# Generate server certificate signing request.
+openssl req \
+    -key "$outdir/server.key" \
+    -new \
+    -subj "/O=go-remote" \
+    -out "$outdir/server.csr"
+openssl req -in "$outdir/server.csr" -text
+"${showcsr[@]}" "$outdir/server.csr"
+
+# Get file contents for `-extfile` argument values.
+extfile() {
+    cat <<EOF
+[server]
+extendedKeyUsage = serverAuth
+subjectAltName = DNS:server
+
+[client]
+extendedKeyUsage = clientAuth
+EOF
+}
+
+# Convert the above CSR into a certificate.
+openssl x509 \
+    -req \
+    -in "$outdir/server.csr" \
+    -CA "$outdir/ca.pem" \
+    -CAkey "$outdir/ca.key" \
+    -set_serial "$(gen_serial)" \
+    -days 14 \
+    -extfile <(extfile) \
+    -extensions server \
+    -out "$outdir/server.pem"
+"${showpem[@]}" "$outdir/server.pem"
+
+client_kinds=(observe control)
+
+for kind in "${client_kinds[@]}"; do
+    # Generate client private key.
+    "${genpkey[@]}" "$outdir/client-$kind.key"
+    openssl pkey -in "$outdir/client-$kind.key" -text
+
+    # Generate client certificate signing request.
+    #
+    # Clients encode their authorization level in `OU`. We pretend that the CA
+    # would reject the CSR if the client asked for an authorization level that
+    # the CA doesn't agree with.
+    openssl req \
+        -key "$outdir/client-$kind.key" \
+        -new \
+        -subj "/CN=client-$kind/OU=$kind" \
+        -out "$outdir/client-$kind.csr"
+    "${showcsr[@]}" "$outdir/client-$kind.csr"
+
+    # Convert the above CSR into a certificate.
+    openssl x509 \
+        -req \
+        -in "$outdir/client-$kind.csr" \
+        -CA "$outdir/ca.pem" \
+        -CAkey "$outdir/ca.key" \
+        -set_serial "$(gen_serial)" \
+        -days 14 \
+        -extfile <(extfile) \
+        -extensions client \
+        -out "$outdir/client-$kind.pem"
+    "${showpem[@]}" "$outdir/client-$kind.pem"
+done

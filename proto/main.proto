@@ -1,5 +1,7 @@
 edition = "2023";
 
+option go_package = "github.com/CobaltCause/go-remote/v2/gen/proto";
+
 import "google/protobuf/empty.proto";
 
 service GoRemote {

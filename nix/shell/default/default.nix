@@ -6,9 +6,9 @@
   go,
   markdownlint-cli,
   mkShell,
-  protobuf,
-  protoc-gen-go,
   reuse,
+  shellcheck,
+  shfmt,
 }:
 
 mkShell {
@@ -18,9 +18,9 @@ mkShell {
     findutils
     go
     markdownlint-cli
-    protobuf
-    protoc-gen-go
     reuse
+    shellcheck
+    shfmt
   ]
   # Keep sorted.
   ++ default.buildInputs
